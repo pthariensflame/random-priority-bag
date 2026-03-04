@@ -2,7 +2,9 @@
 name = "random-priority-bag"
 version = "0.1.0"
 edition = "2024"
-categories = []
+rust-version = "1.93"
+license = "MIT OR Apache-2.0"
+categories = ["data-structures", "no-std"]
 
 [dependencies]
 rand = { version = "0.10.0", default-features = false, features = ["alloc"] }
