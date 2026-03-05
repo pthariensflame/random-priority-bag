@@ -89,26 +89,26 @@ impl<T: HasPriority, R: ?Sized> RandomPriorityBag<T, R> {
         assert!(self.group_ends.is_empty() == res);
         res
     }
-    
+
     pub fn shrink_to_fit(&mut self) {
         self.elems.shrink_to_fit();
         self.group_ends.shrink_to_fit();
     }
-    
+
     pub fn reserve(&mut self, additional_elements: usize, additional_priorities: usize) {
         self.elems.reserve(additional_elements);
         self.group_ends.reserve(additional_priorities);
     }
-    
+
     pub fn reserve_exact(&mut self, additional_elements: usize, additional_priorities: usize) {
         self.elems.reserve_exact(additional_elements);
         self.group_ends.reserve_exact(additional_priorities);
     }
-    
+
     pub const fn len(&self) -> usize {
         self.elems.len()
     }
-    
+
     pub const fn num_priority_groups(&self) -> usize {
         self.group_ends.len()
     }
