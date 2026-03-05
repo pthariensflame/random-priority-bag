@@ -20,6 +20,7 @@ use rand::{Rng, RngExt as _};
 
 pub trait HasPriority {
     type Priority: Ord;
+
     fn get_priority(&self) -> Self::Priority;
 }
 
