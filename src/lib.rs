@@ -16,7 +16,8 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use rand::prelude::*;
+use core::{iter::Rev, slice};
+use rand::{prelude::*, seq::index};
 
 pub trait HasPriority {
     type Priority: Ord;
@@ -220,8 +221,91 @@ impl<T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIter<T, R> {
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.rpb.len();
+        let len = self.len();
         (len, Some(len))
+    }
+}
+
+impl<T: HasPriority, R: ?Sized + Rng> ExactSizeIterator for ElementsIter<T, R> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.rpb.len()
+    }
+}
+
+impl<T: HasPriority, R> ElementsIter<T, R> {
+    pub fn into_random_priority_bag(self) -> RandomPriorityBag<T, R> {
+        self.rpb
+    }
+}
+
+pub struct ElementsIterRef<'a, T: HasPriority, R: ?Sized> {
+    current_group_elems: &'a [T],
+    current_group_ixs: index::IndexVecIntoIter,
+    remaining_elems: &'a [T],
+    remaining_group_ends: Rev<slice::Iter<'a, (T::Priority, usize)>>,
+    rng: R,
+}
+
+impl<'a, T: HasPriority, R: Clone> Clone for ElementsIterRef<'a, T, R> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            current_group_elems: self.current_group_elems,
+            current_group_ixs: self.current_group_ixs.clone(),
+            remaining_elems: self.remaining_elems,
+            remaining_group_ends: self.remaining_group_ends.clone(),
+            rng: self.rng.clone(),
+        }
+    }
+
+    #[inline]
+    fn clone_from(&mut self, source: &Self) {
+        self.current_group_elems = source.current_group_elems;
+        self.current_group_ixs.clone_from(&source.current_group_ixs);
+        self.remaining_elems = source.remaining_elems;
+        self.remaining_group_ends
+            .clone_from(&source.remaining_group_ends);
+        self.rng.clone_from(&source.rng);
+    }
+}
+
+impl<'a, T: HasPriority, R: Rng + SeedableRng> IntoIterator for &'a RandomPriorityBag<T, R> {
+    type Item = &'a T;
+
+    type IntoIter = ElementsIterRef<'a, T, R>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        ElementsIterRef {
+            current_group_elems: todo!(),
+            current_group_ixs: todo!(),
+            remaining_elems: todo!(),
+            remaining_group_ends: todo!(),
+            rng: self.rng.fork(),
+        }
+    }
+}
+
+impl<'a, T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIterRef<'a, T, R> {
+    type Item = &'a T;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        todo!()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.len();
+        (len, Some(len))
+    }
+}
+
+impl<'a, T: HasPriority, R: ?Sized + Rng> ExactSizeIterator for ElementsIterRef<'a, T, R> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.current_group_ixs.len() + self.remaining_elems.len()
     }
 }
 
