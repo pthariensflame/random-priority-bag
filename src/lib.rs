@@ -16,8 +16,7 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use core::{iter::Rev, slice};
-use rand::{prelude::*, seq::index};
+use rand::prelude::*;
 
 pub trait HasPriority {
     type Priority: Ord;
