@@ -16,7 +16,8 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use rand::{Rng, RngExt as _};
+use core::{iter::Rev, slice};
+use rand::{prelude::*, seq::index};
 
 pub trait HasPriority {
     type Priority: Ord;
@@ -61,10 +62,7 @@ impl<T: HasPriority, R: Default> Default for RandomPriorityBag<T, R> {
     }
 }
 
-impl<T: HasPriority + Clone, R: Clone> Clone for RandomPriorityBag<T, R>
-where
-    T::Priority: Clone,
-{
+impl<T: HasPriority<Priority: Clone> + Clone, R: Clone> Clone for RandomPriorityBag<T, R> {
     #[inline]
     fn clone(&self) -> Self {
         Self {
@@ -91,25 +89,32 @@ impl<T: HasPriority, R: ?Sized> RandomPriorityBag<T, R> {
         res
     }
 
+    #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.elems.shrink_to_fit();
         self.group_ends.shrink_to_fit();
     }
 
+    #[inline]
     pub fn reserve(&mut self, additional_elements: usize, additional_priorities: usize) {
         self.elems.reserve(additional_elements);
         self.group_ends.reserve(additional_priorities);
     }
 
+    #[inline]
     pub fn reserve_exact(&mut self, additional_elements: usize, additional_priorities: usize) {
         self.elems.reserve_exact(additional_elements);
         self.group_ends.reserve_exact(additional_priorities);
     }
 
+    #[inline]
+    #[must_use]
     pub const fn len(&self) -> usize {
         self.elems.len()
     }
 
+    #[inline]
+    #[must_use]
     pub const fn num_priority_groups(&self) -> usize {
         self.group_ends.len()
     }
@@ -174,6 +179,50 @@ impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
 
             self.elems.insert(new_elem_pos, new_elem);
         }
+    }
+}
+
+pub struct ElementsIter<T: HasPriority, R: ?Sized> {
+    rpb: RandomPriorityBag<T, R>,
+}
+
+impl<T: HasPriority<Priority: Clone> + Clone, R: Clone> Clone for ElementsIter<T, R> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            rpb: self.rpb.clone(),
+        }
+    }
+
+    #[inline]
+    fn clone_from(&mut self, source: &Self) {
+        self.rpb.clone_from(&source.rpb)
+    }
+}
+
+impl<'a, T: HasPriority, R: Rng> IntoIterator for RandomPriorityBag<T, R> {
+    type Item = T;
+
+    type IntoIter = ElementsIter<T, R>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        ElementsIter { rpb: self }
+    }
+}
+
+impl<T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIter<T, R> {
+    type Item = T;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.rpb.pop()
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.rpb.len();
+        (len, Some(len))
     }
 }
 
