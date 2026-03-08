@@ -1,0 +1,182 @@
+use crate::has_priority::HasPriority;
+use parking_lot::Mutex;
+use rand::prelude::*;
+
+pub struct RandomPriorityBag<T: HasPriority, R: ?Sized> {
+    pub(crate) group_ends: Vec<(T::Priority, usize)>,
+    pub(crate) elems: Vec<T>,
+    pub(crate) rng: Mutex<R>,
+}
+
+impl<T: HasPriority, R> RandomPriorityBag<T, R> {
+    #[inline]
+    #[must_use]
+    pub const fn new(rng: R) -> Self {
+        Self {
+            group_ends: Vec::new(),
+            elems: Vec::new(),
+            rng: Mutex::new(rng),
+        }
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn from_vec<V: Into<Vec<T>>>(vec: V, rng: R) -> Self {
+        fn inner<T: HasPriority, R>(mut elems: Vec<T>, rng: R) -> RandomPriorityBag<T, R> {
+            let mut group_ends = Vec::with_capacity(elems.len().isqrt()); // heuristic size
+            elems.sort_unstable_by_key(T::get_priority);
+            elems.iter().enumerate().for_each(|(ix, elem)| {
+                let prio = elem.get_priority();
+                if let Some((existing_prio, existing_ix)) = group_ends.last_mut()
+                    && *existing_prio == prio
+                {
+                    *existing_ix = ix;
+                } else {
+                    group_ends.push((prio, ix));
+                }
+            });
+            RandomPriorityBag {
+                group_ends,
+                elems,
+                rng: Mutex::new(rng),
+            }
+        }
+        inner(vec.into(), rng)
+    }
+}
+
+impl<T: HasPriority, R: Default> Default for RandomPriorityBag<T, R> {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            group_ends: Vec::new(),
+            elems: Vec::new(),
+            rng: Mutex::default(),
+        }
+    }
+}
+
+impl<T: HasPriority<Priority: Clone> + Clone, R: Rng + SeedableRng> Clone
+    for RandomPriorityBag<T, R>
+{
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            group_ends: self.group_ends.clone(),
+            elems: self.elems.clone(),
+            rng: Mutex::new(self.rng.lock().fork()),
+        }
+    }
+
+    #[inline]
+    fn clone_from(&mut self, source: &Self) {
+        self.group_ends.clone_from(&source.group_ends);
+        self.elems.clone_from(&source.elems);
+        *self.rng.get_mut() = source.rng.lock().fork();
+    }
+}
+
+impl<T: HasPriority, R: ?Sized> RandomPriorityBag<T, R> {
+    #[inline]
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        let res = self.elems.is_empty();
+        assert!(self.group_ends.is_empty() == res);
+        res
+    }
+
+    #[inline]
+    pub fn shrink_to_fit(&mut self) {
+        self.elems.shrink_to_fit();
+        self.group_ends.shrink_to_fit();
+    }
+
+    #[inline]
+    pub fn reserve(&mut self, additional_elements: usize, additional_priorities: usize) {
+        self.elems.reserve(additional_elements);
+        self.group_ends.reserve(additional_priorities);
+    }
+
+    #[inline]
+    pub fn reserve_exact(&mut self, additional_elements: usize, additional_priorities: usize) {
+        self.elems.reserve_exact(additional_elements);
+        self.group_ends.reserve_exact(additional_priorities);
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn len(&self) -> usize {
+        self.elems.len()
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn num_priority_groups(&self) -> usize {
+        self.group_ends.len()
+    }
+}
+
+impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
+    pub fn pop(&mut self) -> Option<T> {
+        if self.is_empty() {
+            return None;
+        }
+
+        let final_end = self.group_ends.last().unwrap().1;
+        let preceding_end = if let Some(preceding_end_ix) = self.group_ends.len().checked_sub(2) {
+            self.group_ends[preceding_end_ix].1
+        } else {
+            0
+        };
+
+        let pos = self.rng.lock().random_range(preceding_end..final_end);
+        let best = self.elems.swap_remove(pos);
+
+        self.group_ends.pop_if(|(_, position)| {
+            *position -= 1;
+            *position == preceding_end
+        });
+
+        Some(best)
+    }
+
+    pub fn push(&mut self, new_elem: T) {
+        let new_elem_priority = new_elem.get_priority();
+
+        let group_pos = self
+            .group_ends
+            .partition_point(|(group_priority, _)| new_elem_priority <= *group_priority);
+
+        if let Some(&(ref group_priority, group_end)) = self.group_ends.get(group_pos)
+            && *group_priority == new_elem_priority
+        {
+            // including current (existing) group
+            if let Some(later_groups) = self.group_ends.get_mut(group_pos..) {
+                later_groups.iter_mut().for_each(|(_, later_group_end)| {
+                    *later_group_end += 1;
+                });
+            }
+
+            self.elems.insert(group_end, new_elem);
+        } else {
+            let new_elem_pos = self
+                .group_ends
+                .get(group_pos)
+                .map_or(self.elems.len(), |(_, pos)| *pos);
+            self.group_ends
+                .insert(group_pos, (new_elem_priority, new_elem_pos));
+
+            // excluding current (new) group
+            if let Some(later_groups) = self.group_ends.get_mut((group_pos + 1)..) {
+                later_groups.iter_mut().for_each(|(_, later_group_end)| {
+                    *later_group_end += 1;
+                });
+            }
+
+            self.elems.insert(new_elem_pos, new_elem);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {}
