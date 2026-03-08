@@ -186,5 +186,21 @@ impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
     }
 }
 
+impl<T: HasPriority, R: Rng> RandomPriorityBag<T, R> {
+    pub fn into_vec<V>(self) -> Vec<T> {
+        let Self {
+            group_ends,
+            mut elems,
+            rng,
+        } = self;
+        let mut prior_end = 0;
+        group_ends.iter().for_each(|&(_, group_end)| {
+            elems[prior_end..group_end].shuffle(&mut rng.lock());
+            prior_end = group_end;
+        });
+        elems
+    }
+}
+
 #[cfg(test)]
 mod tests {}
