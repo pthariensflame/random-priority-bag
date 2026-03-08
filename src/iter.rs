@@ -1,7 +1,10 @@
 use crate::{RandomPriorityBag, has_priority::HasPriority};
 use parking_lot::Mutex;
 use rand::{prelude::*, seq::index};
-use std::{iter::Rev, slice};
+use std::{
+    iter::{FusedIterator, Rev},
+    slice,
+};
 
 pub struct ElementsIter<T: HasPriority, R: ?Sized> {
     rpb: RandomPriorityBag<T, R>,
@@ -15,6 +18,12 @@ impl<T: HasPriority, R: Rng> IntoIterator for RandomPriorityBag<T, R> {
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         ElementsIter { rpb: self }
+    }
+}
+
+impl<T: HasPriority, R> ElementsIter<T, R> {
+    pub fn into_random_priority_bag(self) -> RandomPriorityBag<T, R> {
+        self.rpb
     }
 }
 
@@ -40,11 +49,7 @@ impl<T: HasPriority, R: ?Sized + Rng> ExactSizeIterator for ElementsIter<T, R> {
     }
 }
 
-impl<T: HasPriority, R> ElementsIter<T, R> {
-    pub fn into_random_priority_bag(self) -> RandomPriorityBag<T, R> {
-        self.rpb
-    }
-}
+impl<T: HasPriority, R: ?Sized + Rng> FusedIterator for ElementsIter<T, R> {}
 
 pub struct ElementsIterRef<'a, T: HasPriority, R: ?Sized> {
     current_group_elems: &'a [T],
@@ -131,6 +136,8 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> ExactSizeIterator for ElementsIterRef<
     }
 }
 
+impl<'a, T: HasPriority, R: ?Sized + Rng> FusedIterator for ElementsIterRef<'a, T, R> {}
+
 pub struct ElementsIterMut<'a, T: HasPriority, R: ?Sized> {
     current_group_elems: &'a mut [T],
     remaining_elems: &'a mut [T],
@@ -199,6 +206,8 @@ where
         Self::from_vec(elems, R::default())
     }
 }
+
+impl<'a, T: HasPriority, R: ?Sized + Rng> FusedIterator for ElementsIterMut<'a, T, R> {}
 
 impl<T, R> Extend<T> for RandomPriorityBag<T, R>
 where

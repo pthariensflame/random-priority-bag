@@ -1,6 +1,7 @@
 use crate::has_priority::HasPriority;
 use parking_lot::Mutex;
 use rand::prelude::*;
+use std::iter::FusedIterator;
 
 pub struct RandomPriorityBag<T: HasPriority, R: ?Sized> {
     pub(crate) group_ends: Vec<(T::Priority, usize)>,
@@ -104,6 +105,12 @@ impl<T: HasPriority, R: ?Sized> RandomPriorityBag<T, R> {
     }
 
     #[inline]
+    pub fn clear(&mut self) {
+        self.elems.clear();
+        self.group_ends.clear();
+    }
+
+    #[inline]
     #[must_use]
     pub const fn len(&self) -> usize {
         self.elems.len()
@@ -113,6 +120,12 @@ impl<T: HasPriority, R: ?Sized> RandomPriorityBag<T, R> {
     #[must_use]
     pub const fn priorities_len(&self) -> usize {
         self.group_ends.len()
+    }
+
+    pub fn priorities(
+        &self,
+    ) -> impl ExactSizeIterator<Item = &T::Priority> + DoubleEndedIterator + FusedIterator {
+        self.group_ends.iter().map(|(prio, _)| prio)
     }
 }
 
