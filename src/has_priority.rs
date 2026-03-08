@@ -39,6 +39,17 @@ where
     }
 }
 
+impl<T> HasPriority for Option<T>
+where
+    T: HasPriority,
+{
+    type Priority = Option<T::Priority>;
+
+    fn get_priority(&self) -> Self::Priority {
+        self.as_ref().map(T::get_priority)
+    }
+}
+
 impl<'a, T> HasPriority for std::borrow::Cow<'a, T>
 where
     T: ?Sized + HasPriority + ToOwned,
@@ -91,6 +102,17 @@ where
 
     fn get_priority(&self) -> Self::Priority {
         self.upgrade().map(|this| this.get_priority())
+    }
+}
+
+impl<T, const N: usize> HasPriority for [T; N]
+where
+    T: HasPriority,
+{
+    type Priority = [T::Priority; N];
+
+    fn get_priority(&self) -> Self::Priority {
+        self.each_ref().map(T::get_priority)
     }
 }
 
