@@ -111,7 +111,7 @@ impl<T: HasPriority, R: ?Sized> RandomPriorityBag<T, R> {
 
     #[inline]
     #[must_use]
-    pub const fn num_priority_groups(&self) -> usize {
+    pub const fn priorities_len(&self) -> usize {
         self.group_ends.len()
     }
 }
@@ -175,6 +175,14 @@ impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
 
             self.elems.insert(new_elem_pos, new_elem);
         }
+    }
+
+    pub fn iter(&self) -> crate::iter::ElementsIterRef<'_, T, R> {
+        self.into_iter()
+    }
+
+    pub fn iter_mut(&mut self) -> crate::iter::ElementsIterMut<'_, T, R> {
+        self.into_iter()
     }
 }
 

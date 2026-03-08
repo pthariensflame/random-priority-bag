@@ -7,20 +7,6 @@ pub struct ElementsIter<T: HasPriority, R: ?Sized> {
     rpb: RandomPriorityBag<T, R>,
 }
 
-impl<T: HasPriority<Priority: Clone> + Clone, R: Rng + SeedableRng> Clone for ElementsIter<T, R> {
-    #[inline]
-    fn clone(&self) -> Self {
-        Self {
-            rpb: self.rpb.clone(),
-        }
-    }
-
-    #[inline]
-    fn clone_from(&mut self, source: &Self) {
-        self.rpb.clone_from(&source.rpb)
-    }
-}
-
 impl<T: HasPriority, R: Rng> IntoIterator for RandomPriorityBag<T, R> {
     type Item = T;
 
@@ -91,7 +77,7 @@ impl<'a, T: HasPriority, R: Clone> Clone for ElementsIterRef<'a, T, R> {
     }
 }
 
-impl<'a, T: HasPriority, R: Rng + SeedableRng> IntoIterator for &'a RandomPriorityBag<T, R> {
+impl<'a, T: HasPriority, R: ?Sized + Rng> IntoIterator for &'a RandomPriorityBag<T, R> {
     type Item = &'a T;
 
     type IntoIter = ElementsIterRef<'a, T, R>;
@@ -152,7 +138,7 @@ pub struct ElementsIterMut<'a, T: HasPriority, R: ?Sized> {
     rng: &'a mut R,
 }
 
-impl<'a, T: HasPriority, R: Rng + SeedableRng> IntoIterator for &'a mut RandomPriorityBag<T, R> {
+impl<'a, T: HasPriority, R: ?Sized + Rng> IntoIterator for &'a mut RandomPriorityBag<T, R> {
     type Item = &'a mut T;
 
     type IntoIter = ElementsIterMut<'a, T, R>;
