@@ -54,7 +54,7 @@ pub struct ElementsIterRef<'a, T: HasPriority, R: ?Sized> {
     rng: &'a Mutex<R>,
 }
 
-impl<'a, T: HasPriority, R: Clone> Clone for ElementsIterRef<'a, T, R> {
+impl<'a, T: HasPriority, R: ?Sized> Clone for ElementsIterRef<'a, T, R> {
     #[inline]
     fn clone(&self) -> Self {
         Self {
