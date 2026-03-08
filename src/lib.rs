@@ -44,7 +44,7 @@ where
     }
 }
 
-impl<T> HasPriority for alloc::boxed::Box<T>
+impl<T> HasPriority for Box<T>
 where
     T: ?Sized + HasPriority,
 {
@@ -55,9 +55,9 @@ where
     }
 }
 
-impl<'a, T> HasPriority for alloc::borrow::Cow<'a, T>
+impl<'a, T> HasPriority for std::borrow::Cow<'a, T>
 where
-    T: ?Sized + HasPriority + alloc::borrow::ToOwned,
+    T: ?Sized + HasPriority + ToOwned,
 {
     type Priority = T::Priority;
 
@@ -66,7 +66,7 @@ where
     }
 }
 
-impl<T> HasPriority for alloc::rc::Rc<T>
+impl<T> HasPriority for std::rc::Rc<T>
 where
     T: ?Sized + HasPriority,
 {
@@ -77,7 +77,7 @@ where
     }
 }
 
-impl<T> HasPriority for alloc::sync::Arc<T>
+impl<T> HasPriority for std::sync::Arc<T>
 where
     T: ?Sized + HasPriority,
 {
