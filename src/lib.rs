@@ -17,6 +17,7 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use core::{iter::Rev, slice};
+use parking_lot::Mutex;
 use rand::{prelude::*, seq::index};
 
 pub trait HasPriority {
@@ -25,10 +26,76 @@ pub trait HasPriority {
     fn get_priority(&self) -> Self::Priority;
 }
 
+impl<T> HasPriority for &T
+where
+    T: ?Sized + HasPriority,
+{
+    type Priority = T::Priority;
+
+    fn get_priority(&self) -> Self::Priority {
+        T::get_priority(self)
+    }
+}
+
+impl<T> HasPriority for &mut T
+where
+    T: ?Sized + HasPriority,
+{
+    type Priority = T::Priority;
+
+    fn get_priority(&self) -> Self::Priority {
+        T::get_priority(self)
+    }
+}
+
+impl<T> HasPriority for alloc::boxed::Box<T>
+where
+    T: ?Sized + HasPriority,
+{
+    type Priority = T::Priority;
+
+    fn get_priority(&self) -> Self::Priority {
+        T::get_priority(self)
+    }
+}
+
+impl<'a, T> HasPriority for alloc::borrow::Cow<'a, T>
+where
+    T: ?Sized + HasPriority + alloc::borrow::ToOwned,
+{
+    type Priority = T::Priority;
+
+    fn get_priority(&self) -> Self::Priority {
+        T::get_priority(self)
+    }
+}
+
+impl<T> HasPriority for alloc::rc::Rc<T>
+where
+    T: ?Sized + HasPriority,
+{
+    type Priority = T::Priority;
+
+    fn get_priority(&self) -> Self::Priority {
+        T::get_priority(self)
+    }
+}
+
+impl<T> HasPriority for alloc::sync::Arc<T>
+where
+    T: ?Sized + HasPriority,
+{
+    type Priority = T::Priority;
+
+    fn get_priority(&self) -> Self::Priority {
+        T::get_priority(self)
+    }
+}
+
 pub struct RandomPriorityBag<T: HasPriority, R: ?Sized> {
     group_ends: Vec<(T::Priority, usize)>,
     elems: Vec<T>,
-    rng: R,
+    rng: Mutex<R>,
 }
 
 impl<T: HasPriority, R: Default> RandomPriorityBag<T, R> {
@@ -38,7 +105,7 @@ impl<T: HasPriority, R: Default> RandomPriorityBag<T, R> {
         Self {
             group_ends: Vec::new(),
             elems: Vec::new(),
-            rng: R::default(),
+            rng: Mutex::default(),
         }
     }
 }
@@ -50,7 +117,7 @@ impl<T: HasPriority, R> RandomPriorityBag<T, R> {
         Self {
             group_ends: Vec::new(),
             elems: Vec::new(),
-            rng,
+            rng: Mutex::new(rng),
         }
     }
 }
@@ -62,13 +129,15 @@ impl<T: HasPriority, R: Default> Default for RandomPriorityBag<T, R> {
     }
 }
 
-impl<T: HasPriority<Priority: Clone> + Clone, R: Clone> Clone for RandomPriorityBag<T, R> {
+impl<T: HasPriority<Priority: Clone> + Clone, R: Rng + SeedableRng> Clone
+    for RandomPriorityBag<T, R>
+{
     #[inline]
     fn clone(&self) -> Self {
         Self {
             group_ends: self.group_ends.clone(),
             elems: self.elems.clone(),
-            rng: self.rng.clone(),
+            rng: Mutex::new(self.rng.lock().fork()),
         }
     }
 
@@ -76,7 +145,7 @@ impl<T: HasPriority<Priority: Clone> + Clone, R: Clone> Clone for RandomPriority
     fn clone_from(&mut self, source: &Self) {
         self.group_ends.clone_from(&source.group_ends);
         self.elems.clone_from(&source.elems);
-        self.rng.clone_from(&source.rng);
+        *self.rng.get_mut() = source.rng.lock().fork();
     }
 }
 
@@ -133,7 +202,7 @@ impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
             0
         };
 
-        let pos = self.rng.random_range(preceding_end..final_end);
+        let pos = self.rng.lock().random_range(preceding_end..final_end);
         let best = self.elems.swap_remove(pos);
 
         self.group_ends.pop_if(|(_, position)| {
@@ -186,7 +255,7 @@ pub struct ElementsIter<T: HasPriority, R: ?Sized> {
     rpb: RandomPriorityBag<T, R>,
 }
 
-impl<T: HasPriority<Priority: Clone> + Clone, R: Clone> Clone for ElementsIter<T, R> {
+impl<T: HasPriority<Priority: Clone> + Clone, R: Rng + SeedableRng> Clone for ElementsIter<T, R> {
     #[inline]
     fn clone(&self) -> Self {
         Self {
@@ -200,7 +269,7 @@ impl<T: HasPriority<Priority: Clone> + Clone, R: Clone> Clone for ElementsIter<T
     }
 }
 
-impl<'a, T: HasPriority, R: Rng> IntoIterator for RandomPriorityBag<T, R> {
+impl<T: HasPriority, R: Rng> IntoIterator for RandomPriorityBag<T, R> {
     type Item = T;
 
     type IntoIter = ElementsIter<T, R>;
@@ -244,7 +313,7 @@ pub struct ElementsIterRef<'a, T: HasPriority, R: ?Sized> {
     current_group_ixs: index::IndexVecIntoIter,
     remaining_elems: &'a [T],
     remaining_group_ends: Rev<slice::Iter<'a, (T::Priority, usize)>>,
-    rng: R,
+    rng: &'a Mutex<R>,
 }
 
 impl<'a, T: HasPriority, R: Clone> Clone for ElementsIterRef<'a, T, R> {
@@ -255,7 +324,7 @@ impl<'a, T: HasPriority, R: Clone> Clone for ElementsIterRef<'a, T, R> {
             current_group_ixs: self.current_group_ixs.clone(),
             remaining_elems: self.remaining_elems,
             remaining_group_ends: self.remaining_group_ends.clone(),
-            rng: self.rng.clone(),
+            rng: self.rng,
         }
     }
 
@@ -266,7 +335,7 @@ impl<'a, T: HasPriority, R: Clone> Clone for ElementsIterRef<'a, T, R> {
         self.remaining_elems = source.remaining_elems;
         self.remaining_group_ends
             .clone_from(&source.remaining_group_ends);
-        self.rng.clone_from(&source.rng);
+        self.rng = source.rng
     }
 }
 
@@ -277,12 +346,13 @@ impl<'a, T: HasPriority, R: Rng + SeedableRng> IntoIterator for &'a RandomPriori
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
+        let rng = &self.rng;
         ElementsIterRef {
-            current_group_elems: todo!(),
-            current_group_ixs: todo!(),
-            remaining_elems: todo!(),
-            remaining_group_ends: todo!(),
-            rng: self.rng.fork(),
+            current_group_elems: &[],
+            current_group_ixs: index::sample(&mut rng.lock(), 0, 0).into_iter(),
+            remaining_elems: &self.elems,
+            remaining_group_ends: self.group_ends.iter().rev(),
+            rng,
         }
     }
 }
@@ -292,7 +362,21 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIterRef<'a, T, R>
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        todo!()
+        if let Some(next_ix) = self.current_group_ixs.next() {
+            self.current_group_elems.get(next_ix)
+        } else if let Some(&(_, next_end)) = self.remaining_group_ends.next()
+            && let Some(new_group) = self.remaining_elems.split_off(..next_end)
+        {
+            assert!(!new_group.is_empty());
+            let new_group_len = new_group.len();
+            self.current_group_elems = new_group;
+            self.current_group_ixs =
+                index::sample(&mut self.rng.lock(), new_group_len, new_group_len).into_iter();
+            self.current_group_elems
+                .get(self.current_group_ixs.next().unwrap())
+        } else {
+            None
+        }
     }
 
     #[inline]
@@ -306,6 +390,63 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> ExactSizeIterator for ElementsIterRef<
     #[inline]
     fn len(&self) -> usize {
         self.current_group_ixs.len() + self.remaining_elems.len()
+    }
+}
+
+pub struct ElementsIterMut<'a, T: HasPriority, R: ?Sized> {
+    current_group_elems: &'a mut [T],
+    remaining_elems: &'a mut [T],
+    remaining_group_ends: Rev<slice::Iter<'a, (T::Priority, usize)>>,
+    rng: &'a mut R,
+}
+
+impl<'a, T: HasPriority, R: Rng + SeedableRng> IntoIterator for &'a mut RandomPriorityBag<T, R> {
+    type Item = &'a mut T;
+
+    type IntoIter = ElementsIterMut<'a, T, R>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        let rng = self.rng.get_mut();
+        ElementsIterMut {
+            current_group_elems: &mut [],
+            remaining_elems: &mut self.elems,
+            remaining_group_ends: self.group_ends.iter().rev(),
+            rng,
+        }
+    }
+}
+
+impl<'a, T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIterMut<'a, T, R> {
+    type Item = &'a mut T;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(next_val) = self.current_group_elems.split_off_last_mut() {
+            Some(next_val)
+        } else if let Some(&(_, next_end)) = self.remaining_group_ends.next()
+            && let Some(new_group) = self.remaining_elems.split_off_mut(..next_end)
+        {
+            assert!(!new_group.is_empty());
+            new_group.shuffle(self.rng);
+            self.current_group_elems = new_group;
+            self.current_group_elems.split_off_last_mut()
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.len();
+        (len, Some(len))
+    }
+}
+
+impl<'a, T: HasPriority, R: ?Sized + Rng> ExactSizeIterator for ElementsIterMut<'a, T, R> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.current_group_elems.len() + self.remaining_elems.len()
     }
 }
 
