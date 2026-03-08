@@ -475,5 +475,34 @@ where
     }
 }
 
+impl<T, R> Extend<T> for RandomPriorityBag<T, R>
+where
+    T: HasPriority,
+    R: ?Sized,
+{
+    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
+        let old_len = self.elems.len();
+        self.elems.extend(iter);
+        let increase = self.elems.len() - old_len;
+
+        if increase > 0 {
+            // only do work if needed
+            self.elems.sort_unstable_by_key(T::get_priority);
+            self.group_ends.reserve(increase.isqrt()); // heuristic size increase
+            self.group_ends.clear();
+            self.elems.iter().enumerate().for_each(|(ix, elem)| {
+                let prio = elem.get_priority();
+                if let Some((existing_prio, existing_ix)) = self.group_ends.last_mut()
+                    && *existing_prio == prio
+                {
+                    *existing_ix = ix;
+                } else {
+                    self.group_ends.push((prio, ix));
+                }
+            });
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {}
