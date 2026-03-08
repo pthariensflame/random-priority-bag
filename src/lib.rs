@@ -12,13 +12,9 @@
 //    See the License for the specific language governing permissions and
 //    limitations under the License.
 
-#![no_std]
-extern crate alloc;
-
-use alloc::vec::Vec;
-use core::{iter::Rev, slice};
 use parking_lot::Mutex;
 use rand::{prelude::*, seq::index};
+use std::{iter::Rev, slice};
 
 pub trait HasPriority {
     type Priority: Ord;
