@@ -104,6 +104,31 @@ impl<T: HasPriority, R> RandomPriorityBag<T, R> {
             rng: Mutex::new(rng),
         }
     }
+
+    #[inline]
+    #[must_use]
+    pub fn from_vec<V: Into<Vec<T>>>(vec: V, rng: R) -> Self {
+        fn inner<T: HasPriority, R>(mut elems: Vec<T>, rng: R) -> RandomPriorityBag<T, R> {
+            let mut group_ends = Vec::with_capacity(elems.len().isqrt()); // heuristic size
+            elems.sort_unstable_by_key(T::get_priority);
+            elems.iter().enumerate().for_each(|(ix, elem)| {
+                let prio = elem.get_priority();
+                if let Some((existing_prio, existing_ix)) = group_ends.last_mut()
+                    && *existing_prio == prio
+                {
+                    *existing_ix = ix;
+                } else {
+                    group_ends.push((prio, ix));
+                }
+            });
+            RandomPriorityBag {
+                group_ends,
+                elems,
+                rng: Mutex::new(rng),
+            }
+        }
+        inner(vec.into(), rng)
+    }
 }
 
 impl<T: HasPriority, R: Default> Default for RandomPriorityBag<T, R> {
@@ -445,24 +470,8 @@ where
 {
     #[inline]
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
-        let mut elems = Vec::from_iter(iter);
-        let mut group_ends = Vec::with_capacity(elems.len().isqrt()); // heuristic size
-        elems.sort_unstable_by_key(T::get_priority);
-        elems.iter().enumerate().for_each(|(ix, elem)| {
-            let prio = elem.get_priority();
-            if let Some((existing_prio, existing_ix)) = group_ends.last_mut()
-                && *existing_prio == prio
-            {
-                *existing_ix = ix;
-            } else {
-                group_ends.push((prio, ix));
-            }
-        });
-        Self {
-            group_ends,
-            elems,
-            rng: Mutex::default(),
-        }
+        let elems = Vec::from_iter(iter);
+        Self::from_vec(elems, R::default())
     }
 }
 
