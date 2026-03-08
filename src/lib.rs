@@ -98,22 +98,10 @@ pub struct RandomPriorityBag<T: HasPriority, R: ?Sized> {
     rng: Mutex<R>,
 }
 
-impl<T: HasPriority, R: Default> RandomPriorityBag<T, R> {
-    #[inline]
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            group_ends: Vec::new(),
-            elems: Vec::new(),
-            rng: Mutex::default(),
-        }
-    }
-}
-
 impl<T: HasPriority, R> RandomPriorityBag<T, R> {
     #[inline]
     #[must_use]
-    pub const fn with_rng(rng: R) -> Self {
+    pub const fn new(rng: R) -> Self {
         Self {
             group_ends: Vec::new(),
             elems: Vec::new(),
@@ -125,7 +113,11 @@ impl<T: HasPriority, R> RandomPriorityBag<T, R> {
 impl<T: HasPriority, R: Default> Default for RandomPriorityBag<T, R> {
     #[inline]
     fn default() -> Self {
-        Self::new()
+        Self {
+            group_ends: Vec::new(),
+            elems: Vec::new(),
+            rng: Mutex::default(),
+        }
     }
 }
 
@@ -213,7 +205,7 @@ impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
         Some(best)
     }
 
-    pub fn insert(&mut self, new_elem: T) {
+    pub fn push(&mut self, new_elem: T) {
         let new_elem_priority = new_elem.get_priority();
 
         let group_pos = self
@@ -447,6 +439,34 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> ExactSizeIterator for ElementsIterMut<
     #[inline]
     fn len(&self) -> usize {
         self.current_group_elems.len() + self.remaining_elems.len()
+    }
+}
+
+impl<T, R> FromIterator<T> for RandomPriorityBag<T, R>
+where
+    T: HasPriority,
+    R: Default,
+{
+    #[inline]
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        let mut elems = Vec::from_iter(iter);
+        let mut group_ends = Vec::with_capacity(elems.len().isqrt()); // heuristic size
+        elems.sort_unstable_by_key(T::get_priority);
+        elems.iter().enumerate().for_each(|(ix, elem)| {
+            let prio = elem.get_priority();
+            if let Some((existing_prio, existing_ix)) = group_ends.last_mut()
+                && *existing_prio == prio
+            {
+                *existing_ix = ix;
+            } else {
+                group_ends.push((prio, ix));
+            }
+        });
+        Self {
+            group_ends,
+            elems,
+            rng: Mutex::default(),
+        }
     }
 }
 
