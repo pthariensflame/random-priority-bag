@@ -20,29 +20,31 @@ impl<T: HasPriority, R> RandomPriorityBag<T, R> {
         }
     }
 
+    #[must_use]
+    fn reconstruct_from_elems(mut elems: Vec<T>, rng: Mutex<R>) -> Self {
+        let mut group_ends = Vec::with_capacity(elems.len().isqrt()); // heuristic size
+        elems.sort_unstable_by_key(T::get_priority);
+        elems.iter().enumerate().for_each(|(ix, elem)| {
+            let prio = elem.get_priority();
+            if let Some((existing_prio, existing_ix)) = group_ends.last_mut()
+                && *existing_prio == prio
+            {
+                *existing_ix = ix;
+            } else {
+                group_ends.push((prio, ix));
+            }
+        });
+        Self {
+            group_ends,
+            elems,
+            rng,
+        }
+    }
+
     #[inline]
     #[must_use]
     pub fn from_vec<V: Into<Vec<T>>>(vec: V, rng: R) -> Self {
-        fn inner<T: HasPriority, R>(mut elems: Vec<T>, rng: R) -> RandomPriorityBag<T, R> {
-            let mut group_ends = Vec::with_capacity(elems.len().isqrt()); // heuristic size
-            elems.sort_unstable_by_key(T::get_priority);
-            elems.iter().enumerate().for_each(|(ix, elem)| {
-                let prio = elem.get_priority();
-                if let Some((existing_prio, existing_ix)) = group_ends.last_mut()
-                    && *existing_prio == prio
-                {
-                    *existing_ix = ix;
-                } else {
-                    group_ends.push((prio, ix));
-                }
-            });
-            RandomPriorityBag {
-                group_ends,
-                elems,
-                rng: Mutex::new(rng),
-            }
-        }
-        inner(vec.into(), rng)
+        Self::reconstruct_from_elems(vec.into(), Mutex::new(rng))
     }
 }
 
@@ -247,6 +249,20 @@ impl<T: HasPriority, R: Rng> RandomPriorityBag<T, R> {
             prior_end = group_end;
         });
         elems
+    }
+
+    pub fn map<U, F>(self, f: F) -> RandomPriorityBag<U, R>
+    where
+        U: HasPriority,
+        F: FnMut(T) -> U,
+    {
+        let Self {
+            group_ends: _,
+            elems,
+            rng,
+        } = self;
+        let mapped_elems = elems.into_iter().map(f).collect();
+        RandomPriorityBag::reconstruct_from_elems(mapped_elems, rng)
     }
 }
 
