@@ -130,7 +130,7 @@ impl<T: HasPriority, R: ?Sized> RandomPriorityBag<T, R> {
 }
 
 impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
-    pub fn pop(&mut self) -> Option<T> {
+    pub fn pop_best(&mut self) -> Option<T> {
         if self.is_empty() {
             return None;
         }
@@ -151,6 +151,29 @@ impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
         });
 
         Some(best)
+    }
+
+    pub fn pop_worst(&mut self) -> Option<T> {
+        if self.is_empty() {
+            return None;
+        }
+
+        let first_end = self.group_ends.first().unwrap().1;
+
+        let pos = self.rng.lock().random_range(0..first_end);
+        self.elems.swap(pos, first_end - 1);
+        let worst = self.elems.remove(first_end - 1);
+
+        self.group_ends.retain_mut(|(_, group_end)| {
+            if let Some(new_end) = group_end.checked_sub(1) {
+                *group_end = new_end;
+                true
+            } else {
+                false
+            }
+        });
+
+        Some(worst)
     }
 
     pub fn push(&mut self, new_elem: T) {

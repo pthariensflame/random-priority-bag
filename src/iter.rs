@@ -32,13 +32,19 @@ impl<T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIter<T, R> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.rpb.pop()
+        self.rpb.pop_best()
     }
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let len = self.len();
         (len, Some(len))
+    }
+}
+
+impl<T: HasPriority, R: ?Sized + Rng> DoubleEndedIterator for ElementsIter<T, R> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.rpb.pop_worst()
     }
 }
 
