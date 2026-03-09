@@ -162,18 +162,21 @@ impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
 
         let pos = self.rng.lock().random_range(0..first_end);
         self.elems.swap(pos, first_end - 1);
-        let worst = self.elems.remove(first_end - 1);
 
-        self.group_ends.retain_mut(|(_, group_end)| {
-            if let Some(new_end) = group_end.checked_sub(1) {
-                *group_end = new_end;
-                true
-            } else {
-                false
+        if self.group_ends.len() >= 2 {
+            for i in 1..self.group_ends.len() {
+                self.elems
+                    .swap(self.group_ends[i - 1].1 - 1, self.group_ends[i].1 - 1);
+                self.group_ends[i - 1].1 -= 1
             }
-        });
+        }
+        self.group_ends.last_mut().unwrap().1 -= 1;
 
-        Some(worst)
+        if self.group_ends.first().unwrap().1 == 0 {
+            self.group_ends.remove(0);
+        }
+
+        self.elems.pop()
     }
 
     pub fn push(&mut self, new_elem: T) {
@@ -211,6 +214,15 @@ impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
 
             self.elems.insert(new_elem_pos, new_elem);
         }
+    }
+
+    pub fn reshuffle(&mut self) {
+        let mut rng = self.rng.lock();
+        let mut prev_end = 0;
+        self.group_ends.iter().for_each(|&(_, curr_end)| {
+            self.elems[prev_end..curr_end].shuffle(&mut rng);
+            prev_end = curr_end;
+        });
     }
 
     pub fn iter(&self) -> crate::iter::ElementsIterRef<'_, T, R> {
