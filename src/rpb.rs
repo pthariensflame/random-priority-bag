@@ -248,13 +248,11 @@ impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
     }
 
     #[inline]
-    #[must_use]
     pub fn iter(&self) -> crate::iter::ElementsIterRef<'_, T, R> {
         self.into_iter()
     }
 
     #[inline]
-    #[must_use]
     pub fn iter_mut(&mut self) -> crate::iter::ElementsIterMut<'_, T, R> {
         self.into_iter()
     }

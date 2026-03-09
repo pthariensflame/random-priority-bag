@@ -3,6 +3,7 @@ use std::cmp::Reverse;
 pub trait HasPriority {
     type Priority: Ord;
 
+    #[must_use]
     fn get_priority(&self) -> Self::Priority;
 }
 
@@ -12,6 +13,7 @@ where
 {
     type Priority = T::Priority;
 
+    #[inline]
     fn get_priority(&self) -> Self::Priority {
         T::get_priority(self)
     }
@@ -23,6 +25,7 @@ where
 {
     type Priority = T::Priority;
 
+    #[inline]
     fn get_priority(&self) -> Self::Priority {
         T::get_priority(self)
     }
@@ -34,6 +37,7 @@ where
 {
     type Priority = T::Priority;
 
+    #[inline]
     fn get_priority(&self) -> Self::Priority {
         T::get_priority(self)
     }
@@ -45,6 +49,7 @@ where
 {
     type Priority = Option<T::Priority>;
 
+    #[inline]
     fn get_priority(&self) -> Self::Priority {
         self.as_ref().map(T::get_priority)
     }
@@ -56,6 +61,7 @@ where
 {
     type Priority = T::Priority;
 
+    #[inline]
     fn get_priority(&self) -> Self::Priority {
         T::get_priority(self)
     }
@@ -67,6 +73,7 @@ where
 {
     type Priority = T::Priority;
 
+    #[inline]
     fn get_priority(&self) -> Self::Priority {
         T::get_priority(self)
     }
@@ -78,6 +85,7 @@ where
 {
     type Priority = Option<T::Priority>;
 
+    #[inline]
     fn get_priority(&self) -> Self::Priority {
         self.upgrade().map(|this| this.get_priority())
     }
@@ -89,6 +97,7 @@ where
 {
     type Priority = T::Priority;
 
+    #[inline]
     fn get_priority(&self) -> Self::Priority {
         T::get_priority(self)
     }
@@ -100,6 +109,7 @@ where
 {
     type Priority = Option<T::Priority>;
 
+    #[inline]
     fn get_priority(&self) -> Self::Priority {
         self.upgrade().map(|this| this.get_priority())
     }
@@ -111,16 +121,19 @@ where
 {
     type Priority = [T::Priority; N];
 
+    #[inline]
     fn get_priority(&self) -> Self::Priority {
         self.each_ref().map(T::get_priority)
     }
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[must_use]
 #[repr(transparent)]
 pub struct SelfPriority<T: ?Sized>(pub T);
 
 impl<T: ?Sized + ToOwned> SelfPriority<T> {
+    #[inline]
     pub fn to_owned(&self) -> SelfPriority<T::Owned> {
         SelfPriority(self.0.to_owned())
     }
@@ -129,18 +142,21 @@ impl<T: ?Sized + ToOwned> SelfPriority<T> {
 impl<T: ?Sized + ToOwned<Owned: Ord>> HasPriority for SelfPriority<T> {
     type Priority = T::Owned;
 
+    #[inline]
     fn get_priority(&self) -> Self::Priority {
         self.0.to_owned()
     }
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[must_use]
 pub struct AttachedPriority<T: ?Sized, P> {
     pub priority: P,
     pub value: T,
 }
 
 impl<T: ?Sized + ToOwned, P: Clone> AttachedPriority<T, P> {
+    #[inline]
     pub fn to_owned(&self) -> AttachedPriority<T::Owned, P> {
         AttachedPriority {
             priority: self.priority.clone(),
@@ -152,16 +168,19 @@ impl<T: ?Sized + ToOwned, P: Clone> AttachedPriority<T, P> {
 impl<T: ?Sized, P: Ord + Clone> HasPriority for AttachedPriority<T, P> {
     type Priority = P;
 
+    #[inline]
     fn get_priority(&self) -> Self::Priority {
         self.priority.clone()
     }
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[must_use]
 #[repr(transparent)]
 pub struct ReversedPriority<T: ?Sized>(pub T);
 
 impl<T: ?Sized + ToOwned> ReversedPriority<T> {
+    #[inline]
     pub fn to_owned(&self) -> ReversedPriority<T::Owned> {
         ReversedPriority(self.0.to_owned())
     }
@@ -170,6 +189,7 @@ impl<T: ?Sized + ToOwned> ReversedPriority<T> {
 impl<T: ?Sized + HasPriority> HasPriority for ReversedPriority<T> {
     type Priority = Reverse<T::Priority>;
 
+    #[inline]
     fn get_priority(&self) -> Self::Priority {
         Reverse(self.0.get_priority())
     }
