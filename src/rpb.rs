@@ -95,6 +95,12 @@ impl<T: HasPriority, R: ?Sized> RandomPriorityBag<T, R> {
     }
 
     #[inline]
+    pub fn shrink_to(&mut self, elements: usize, priorities: usize) {
+        self.elems.shrink_to(elements);
+        self.group_ends.shrink_to(priorities);
+    }
+
+    #[inline]
     pub fn reserve(&mut self, additional_elements: usize, additional_priorities: usize) {
         self.elems.reserve(additional_elements);
         self.group_ends.reserve(additional_priorities);
@@ -124,6 +130,20 @@ impl<T: HasPriority, R: ?Sized> RandomPriorityBag<T, R> {
         self.group_ends.len()
     }
 
+    #[inline]
+    #[must_use]
+    pub const fn capacity(&self) -> usize {
+        self.elems.capacity()
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn priorities_capacity(&self) -> usize {
+        self.group_ends.capacity()
+    }
+
+    #[inline]
+    #[must_use]
     pub fn priorities(
         &self,
     ) -> impl ExactSizeIterator<Item = &T::Priority> + DoubleEndedIterator + FusedIterator {
@@ -227,16 +247,21 @@ impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
         });
     }
 
+    #[inline]
+    #[must_use]
     pub fn iter(&self) -> crate::iter::ElementsIterRef<'_, T, R> {
         self.into_iter()
     }
 
+    #[inline]
+    #[must_use]
     pub fn iter_mut(&mut self) -> crate::iter::ElementsIterMut<'_, T, R> {
         self.into_iter()
     }
 }
 
 impl<T: HasPriority, R: Rng> RandomPriorityBag<T, R> {
+    #[must_use]
     pub fn into_vec<V>(self) -> Vec<T> {
         let Self {
             group_ends,
@@ -251,6 +276,7 @@ impl<T: HasPriority, R: Rng> RandomPriorityBag<T, R> {
         elems
     }
 
+    #[must_use]
     pub fn map<U, F>(self, f: F) -> RandomPriorityBag<U, R>
     where
         U: HasPriority,
