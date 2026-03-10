@@ -159,6 +159,90 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> ExactSizeIterator for ElementsIterRef<
 impl<'a, T: HasPriority, R: ?Sized + Rng> FusedIterator for ElementsIterRef<'a, T, R> {}
 
 #[must_use]
+pub struct ElementsIterRefRev<'a, T: HasPriority, R: ?Sized> {
+    pub(crate) current_group_elems: &'a [T],
+    pub(crate) current_group_ixs: index::IndexVecIntoIter,
+    pub(crate) remaining_elems: &'a [T],
+    pub(crate) remaining_group_ends: &'a [(T::Priority, usize)],
+    pub(crate) exhausted_groups_len: usize,
+    pub(crate) rng: &'a Mutex<R>,
+}
+
+impl<'a, T: HasPriority, R: ?Sized> Clone for ElementsIterRefRev<'a, T, R> {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            current_group_elems: self.current_group_elems,
+            current_group_ixs: self.current_group_ixs.clone(),
+            remaining_elems: self.remaining_elems,
+            remaining_group_ends: self.remaining_group_ends,
+            exhausted_groups_len: self.exhausted_groups_len,
+            rng: self.rng,
+        }
+    }
+
+    #[inline]
+    fn clone_from(&mut self, source: &Self) {
+        self.current_group_elems = source.current_group_elems;
+        self.current_group_ixs.clone_from(&source.current_group_ixs);
+        self.remaining_elems = source.remaining_elems;
+        self.remaining_group_ends
+            .clone_from(&source.remaining_group_ends);
+        self.exhausted_groups_len = source.exhausted_groups_len;
+        self.rng = source.rng
+    }
+}
+
+impl<'a, T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIterRefRev<'a, T, R> {
+    type Item = &'a T;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(next_ix) = self.current_group_ixs.next() {
+            self.current_group_elems.get(next_ix)
+        } else if let Some(&(_, this_end)) = self.remaining_group_ends.split_off_first()
+            && let Some(new_group) = self
+                .remaining_elems
+                .split_off(..this_end - self.exhausted_groups_len)
+        {
+            assert!(!new_group.is_empty());
+            let new_group_len = new_group.len();
+            self.exhausted_groups_len += new_group_len;
+            self.current_group_elems = new_group;
+            self.current_group_ixs =
+                index::sample(&mut self.rng.lock(), new_group_len, new_group_len).into_iter();
+            self.current_group_elems
+                .get(self.current_group_ixs.next().unwrap())
+        } else if !self.remaining_elems.is_empty() {
+            self.current_group_elems = mem::take(&mut self.remaining_elems);
+            let final_group_len = self.current_group_elems.len();
+            self.exhausted_groups_len += final_group_len; // maintaining invariant even when not strictly needed anymore
+            self.current_group_ixs =
+                index::sample(&mut self.rng.lock(), final_group_len, final_group_len).into_iter();
+            self.current_group_elems
+                .get(self.current_group_ixs.next().unwrap())
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.len();
+        (len, Some(len))
+    }
+}
+
+impl<'a, T: HasPriority, R: ?Sized + Rng> ExactSizeIterator for ElementsIterRefRev<'a, T, R> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.current_group_ixs.len() + self.remaining_elems.len()
+    }
+}
+
+impl<'a, T: HasPriority, R: ?Sized + Rng> FusedIterator for ElementsIterRefRev<'a, T, R> {}
+
+#[must_use]
 pub struct ElementsIterMut<'a, T: HasPriority, R: ?Sized> {
     pub(crate) current_group_elems: &'a mut [T],
     pub(crate) remaining_elems: &'a mut [T],
@@ -226,6 +310,58 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> ExactSizeIterator for ElementsIterMut<
 }
 
 impl<'a, T: HasPriority, R: ?Sized + Rng> FusedIterator for ElementsIterMut<'a, T, R> {}
+
+#[must_use]
+pub struct ElementsIterMutRev<'a, T: HasPriority, R: ?Sized> {
+    pub(crate) current_group_elems: &'a mut [T],
+    pub(crate) remaining_elems: &'a mut [T],
+    pub(crate) remaining_group_ends: &'a [(T::Priority, usize)],
+    pub(crate) exhausted_groups_len: usize,
+    pub(crate) rng: &'a mut R,
+}
+
+impl<'a, T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIterMutRev<'a, T, R> {
+    type Item = &'a mut T;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(next_val) = self.current_group_elems.split_off_first_mut() {
+            Some(next_val)
+        } else if let Some(&(_, next_end)) = self.remaining_group_ends.split_off_first()
+            && let Some(new_group) = self
+                .remaining_elems
+                .split_off_mut(..next_end - self.exhausted_groups_len)
+        {
+            assert!(!new_group.is_empty());
+            self.exhausted_groups_len += new_group.len();
+            new_group.shuffle(self.rng);
+            self.current_group_elems = new_group;
+            self.current_group_elems.split_off_first_mut()
+        } else if !self.remaining_elems.is_empty() {
+            self.current_group_elems = mem::take(&mut self.remaining_elems);
+            self.exhausted_groups_len += self.current_group_elems.len(); // maintaining invariant even when not strictly needed anymore
+            self.current_group_elems.shuffle(self.rng);
+            self.current_group_elems.split_off_first_mut()
+        } else {
+            None
+        }
+    }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.len();
+        (len, Some(len))
+    }
+}
+
+impl<'a, T: HasPriority, R: ?Sized + Rng> ExactSizeIterator for ElementsIterMutRev<'a, T, R> {
+    #[inline]
+    fn len(&self) -> usize {
+        self.current_group_elems.len() + self.remaining_elems.len()
+    }
+}
+
+impl<'a, T: HasPriority, R: ?Sized + Rng> FusedIterator for ElementsIterMutRev<'a, T, R> {}
 
 impl<T, R> FromIterator<T> for RandomPriorityBag<T, R>
 where

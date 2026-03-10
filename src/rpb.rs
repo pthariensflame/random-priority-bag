@@ -253,8 +253,43 @@ impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
     }
 
     #[inline]
+    pub fn iter_rev(&self) -> crate::iter::ElementsIterRefRev<'_, T, R> {
+        let rng = &self.rng;
+        let remaining_group_ends = self
+            .group_ends
+            .split_last()
+            .map(|(_, remaining)| remaining)
+            .unwrap_or(&[]);
+        crate::iter::ElementsIterRefRev {
+            current_group_elems: &[],
+            current_group_ixs: rand::seq::index::sample(&mut rng.lock(), 0, 0).into_iter(),
+            remaining_elems: &self.elems,
+            remaining_group_ends,
+            exhausted_groups_len: 0,
+            rng,
+        }
+    }
+
+    #[inline]
     pub fn iter_mut(&mut self) -> crate::iter::ElementsIterMut<'_, T, R> {
         self.into_iter()
+    }
+
+    #[inline]
+    pub fn iter_mut_rev(&mut self) -> crate::iter::ElementsIterMutRev<'_, T, R> {
+        let rng = self.rng.get_mut();
+        let remaining_group_ends = self
+            .group_ends
+            .split_last()
+            .map(|(_, remaining)| remaining)
+            .unwrap_or(&[]);
+        crate::iter::ElementsIterMutRev {
+            current_group_elems: &mut [],
+            remaining_elems: &mut self.elems,
+            remaining_group_ends,
+            exhausted_groups_len: 0,
+            rng,
+        }
     }
 }
 
