@@ -1,14 +1,11 @@
 use crate::{RandomPriorityBag, has_priority::HasPriority};
 use parking_lot::Mutex;
 use rand::{prelude::*, seq::index};
-use std::{
-    iter::{FusedIterator, Rev},
-    slice,
-};
+use std::{iter::FusedIterator, mem};
 
 #[must_use]
 pub struct ElementsIter<T: HasPriority, R: ?Sized> {
-    rpb: RandomPriorityBag<T, R>,
+    pub(crate) rpb: RandomPriorityBag<T, R>,
 }
 
 impl<T: HasPriority, R: Rng> IntoIterator for RandomPriorityBag<T, R> {
@@ -63,11 +60,11 @@ impl<T: HasPriority, R: ?Sized + Rng> FusedIterator for ElementsIter<T, R> {}
 
 #[must_use]
 pub struct ElementsIterRef<'a, T: HasPriority, R: ?Sized> {
-    current_group_elems: &'a [T],
-    current_group_ixs: index::IndexVecIntoIter,
-    remaining_elems: &'a [T],
-    remaining_group_ends: Rev<slice::Iter<'a, (T::Priority, usize)>>,
-    rng: &'a Mutex<R>,
+    pub(crate) current_group_elems: &'a [T],
+    pub(crate) current_group_ixs: index::IndexVecIntoIter,
+    pub(crate) remaining_elems: &'a [T],
+    pub(crate) remaining_group_ends: &'a [(T::Priority, usize)],
+    pub(crate) rng: &'a Mutex<R>,
 }
 
 impl<'a, T: HasPriority, R: ?Sized> Clone for ElementsIterRef<'a, T, R> {
@@ -77,7 +74,7 @@ impl<'a, T: HasPriority, R: ?Sized> Clone for ElementsIterRef<'a, T, R> {
             current_group_elems: self.current_group_elems,
             current_group_ixs: self.current_group_ixs.clone(),
             remaining_elems: self.remaining_elems,
-            remaining_group_ends: self.remaining_group_ends.clone(),
+            remaining_group_ends: self.remaining_group_ends,
             rng: self.rng,
         }
     }
@@ -101,11 +98,16 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> IntoIterator for &'a RandomPriorityBag
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         let rng = &self.rng;
+        let remaining_group_ends = self
+            .group_ends
+            .split_last()
+            .map(|(_, remaining)| remaining)
+            .unwrap_or(&[]);
         ElementsIterRef {
             current_group_elems: &[],
             current_group_ixs: index::sample(&mut rng.lock(), 0, 0).into_iter(),
             remaining_elems: &self.elems,
-            remaining_group_ends: self.group_ends.iter().rev(),
+            remaining_group_ends,
             rng,
         }
     }
@@ -118,14 +120,21 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIterRef<'a, T, R>
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(next_ix) = self.current_group_ixs.next() {
             self.current_group_elems.get(next_ix)
-        } else if let Some(&(_, next_end)) = self.remaining_group_ends.next()
-            && let Some(new_group) = self.remaining_elems.split_off(..next_end)
+        } else if let Some(&(_, next_end)) = self.remaining_group_ends.split_off_last()
+            && let Some(new_group) = self.remaining_elems.split_off(next_end..)
         {
             assert!(!new_group.is_empty());
             let new_group_len = new_group.len();
             self.current_group_elems = new_group;
             self.current_group_ixs =
                 index::sample(&mut self.rng.lock(), new_group_len, new_group_len).into_iter();
+            self.current_group_elems
+                .get(self.current_group_ixs.next().unwrap())
+        } else if !self.remaining_elems.is_empty() {
+            self.current_group_elems = mem::take(&mut self.remaining_elems);
+            let final_group_len = self.current_group_elems.len();
+            self.current_group_ixs =
+                index::sample(&mut self.rng.lock(), final_group_len, final_group_len).into_iter();
             self.current_group_elems
                 .get(self.current_group_ixs.next().unwrap())
         } else {
@@ -151,10 +160,10 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> FusedIterator for ElementsIterRef<'a, 
 
 #[must_use]
 pub struct ElementsIterMut<'a, T: HasPriority, R: ?Sized> {
-    current_group_elems: &'a mut [T],
-    remaining_elems: &'a mut [T],
-    remaining_group_ends: Rev<slice::Iter<'a, (T::Priority, usize)>>,
-    rng: &'a mut R,
+    pub(crate) current_group_elems: &'a mut [T],
+    pub(crate) remaining_elems: &'a mut [T],
+    pub(crate) remaining_group_ends: &'a [(T::Priority, usize)],
+    pub(crate) rng: &'a mut R,
 }
 
 impl<'a, T: HasPriority, R: ?Sized + Rng> IntoIterator for &'a mut RandomPriorityBag<T, R> {
@@ -165,10 +174,15 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> IntoIterator for &'a mut RandomPriorit
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         let rng = self.rng.get_mut();
+        let remaining_group_ends = self
+            .group_ends
+            .split_last()
+            .map(|(_, remaining)| remaining)
+            .unwrap_or(&[]);
         ElementsIterMut {
             current_group_elems: &mut [],
             remaining_elems: &mut self.elems,
-            remaining_group_ends: self.group_ends.iter().rev(),
+            remaining_group_ends,
             rng,
         }
     }
@@ -181,12 +195,16 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIterMut<'a, T, R>
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(next_val) = self.current_group_elems.split_off_last_mut() {
             Some(next_val)
-        } else if let Some(&(_, next_end)) = self.remaining_group_ends.next()
-            && let Some(new_group) = self.remaining_elems.split_off_mut(..next_end)
+        } else if let Some(&(_, next_end)) = self.remaining_group_ends.split_off_last()
+            && let Some(new_group) = self.remaining_elems.split_off_mut(next_end..)
         {
             assert!(!new_group.is_empty());
             new_group.shuffle(self.rng);
             self.current_group_elems = new_group;
+            self.current_group_elems.split_off_last_mut()
+        } else if !self.remaining_elems.is_empty() {
+            self.current_group_elems = mem::take(&mut self.remaining_elems);
+            self.current_group_elems.shuffle(self.rng);
             self.current_group_elems.split_off_last_mut()
         } else {
             None
@@ -207,6 +225,8 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> ExactSizeIterator for ElementsIterMut<
     }
 }
 
+impl<'a, T: HasPriority, R: ?Sized + Rng> FusedIterator for ElementsIterMut<'a, T, R> {}
+
 impl<T, R> FromIterator<T> for RandomPriorityBag<T, R>
 where
     T: HasPriority,
@@ -218,8 +238,6 @@ where
         Self::from_vec(elems, R::default())
     }
 }
-
-impl<'a, T: HasPriority, R: ?Sized + Rng> FusedIterator for ElementsIterMut<'a, T, R> {}
 
 impl<T, R> Extend<T> for RandomPriorityBag<T, R>
 where
