@@ -3,8 +3,16 @@ use std::cmp::Reverse;
 pub trait HasPriority {
     type Priority: Ord;
 
+    /// Expected complexity: O(1)
     #[must_use]
     fn get_priority(&self) -> Self::Priority;
+
+    /// Expected complexity: O(1)
+    #[inline]
+    #[must_use]
+    fn estimate_distinct_priorities(num_elements: usize) -> usize {
+        num_elements.isqrt() // generic heuristic
+    }
 }
 
 impl<T> HasPriority for &T
@@ -16,6 +24,11 @@ where
     #[inline]
     fn get_priority(&self) -> Self::Priority {
         T::get_priority(self)
+    }
+
+    #[inline]
+    fn estimate_distinct_priorities(num_elements: usize) -> usize {
+        T::estimate_distinct_priorities(num_elements)
     }
 }
 
@@ -29,6 +42,11 @@ where
     fn get_priority(&self) -> Self::Priority {
         T::get_priority(self)
     }
+
+    #[inline]
+    fn estimate_distinct_priorities(num_elements: usize) -> usize {
+        T::estimate_distinct_priorities(num_elements)
+    }
 }
 
 impl<T> HasPriority for Box<T>
@@ -40,6 +58,11 @@ where
     #[inline]
     fn get_priority(&self) -> Self::Priority {
         T::get_priority(self)
+    }
+
+    #[inline]
+    fn estimate_distinct_priorities(num_elements: usize) -> usize {
+        T::estimate_distinct_priorities(num_elements)
     }
 }
 
@@ -53,6 +76,11 @@ where
     fn get_priority(&self) -> Self::Priority {
         self.as_ref().map(T::get_priority)
     }
+
+    #[inline]
+    fn estimate_distinct_priorities(num_elements: usize) -> usize {
+        T::estimate_distinct_priorities(num_elements)
+    }
 }
 
 impl<'a, T> HasPriority for std::borrow::Cow<'a, T>
@@ -64,6 +92,11 @@ where
     #[inline]
     fn get_priority(&self) -> Self::Priority {
         T::get_priority(self)
+    }
+
+    #[inline]
+    fn estimate_distinct_priorities(num_elements: usize) -> usize {
+        T::estimate_distinct_priorities(num_elements)
     }
 }
 
@@ -77,6 +110,11 @@ where
     fn get_priority(&self) -> Self::Priority {
         T::get_priority(self)
     }
+
+    #[inline]
+    fn estimate_distinct_priorities(num_elements: usize) -> usize {
+        T::estimate_distinct_priorities(num_elements)
+    }
 }
 
 impl<T> HasPriority for std::rc::Weak<T>
@@ -88,6 +126,14 @@ where
     #[inline]
     fn get_priority(&self) -> Self::Priority {
         self.upgrade().map(|this| this.get_priority())
+    }
+
+    #[inline]
+    fn estimate_distinct_priorities(num_elements: usize) -> usize {
+        T::estimate_distinct_priorities(num_elements)
+            .cast_signed()
+            .saturating_add(1)
+            .cast_unsigned()
     }
 }
 
@@ -101,6 +147,11 @@ where
     fn get_priority(&self) -> Self::Priority {
         T::get_priority(self)
     }
+
+    #[inline]
+    fn estimate_distinct_priorities(num_elements: usize) -> usize {
+        T::estimate_distinct_priorities(num_elements)
+    }
 }
 
 impl<T> HasPriority for std::sync::Weak<T>
@@ -113,6 +164,14 @@ where
     fn get_priority(&self) -> Self::Priority {
         self.upgrade().map(|this| this.get_priority())
     }
+
+    #[inline]
+    fn estimate_distinct_priorities(num_elements: usize) -> usize {
+        T::estimate_distinct_priorities(num_elements)
+            .cast_signed()
+            .saturating_add(1)
+            .cast_unsigned()
+    }
 }
 
 impl<T, const N: usize> HasPriority for [T; N]
@@ -124,6 +183,14 @@ where
     #[inline]
     fn get_priority(&self) -> Self::Priority {
         self.each_ref().map(T::get_priority)
+    }
+
+    #[inline]
+    fn estimate_distinct_priorities(num_elements: usize) -> usize {
+        T::estimate_distinct_priorities(num_elements)
+            .cast_signed()
+            .saturating_mul(N.cast_signed())
+            .cast_unsigned()
     }
 }
 
@@ -192,6 +259,11 @@ impl<T: ?Sized + HasPriority> HasPriority for ReversedPriority<T> {
     #[inline]
     fn get_priority(&self) -> Self::Priority {
         Reverse(self.0.get_priority())
+    }
+
+    #[inline]
+    fn estimate_distinct_priorities(num_elements: usize) -> usize {
+        T::estimate_distinct_priorities(num_elements)
     }
 }
 

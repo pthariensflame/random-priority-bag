@@ -3,6 +3,9 @@ use parking_lot::Mutex;
 use rand::prelude::*;
 use std::iter::FusedIterator;
 
+/// Time complexities are stated in the variables:
+/// - *e*: number of elements
+/// - *p*: number of distinct priorities
 pub struct RandomPriorityBag<T: HasPriority, R: ?Sized> {
     pub(crate) group_ends: Vec<(T::Priority, usize)>,
     pub(crate) elems: Vec<T>,
@@ -10,6 +13,7 @@ pub struct RandomPriorityBag<T: HasPriority, R: ?Sized> {
 }
 
 impl<T: HasPriority, R> RandomPriorityBag<T, R> {
+    /// Complexity: always O(1)
     #[inline]
     #[must_use]
     pub const fn new(rng: R) -> Self {
@@ -20,9 +24,10 @@ impl<T: HasPriority, R> RandomPriorityBag<T, R> {
         }
     }
 
+    // Complexity: worst-case O(*e* log(*e*))
     #[must_use]
     fn reconstruct_from_elems(mut elems: Vec<T>, rng: Mutex<R>) -> Self {
-        let mut group_ends = Vec::with_capacity(elems.len().isqrt()); // heuristic size
+        let mut group_ends = Vec::with_capacity(T::estimate_distinct_priorities(elems.len()));
         elems.sort_unstable_by_key(T::get_priority);
         elems.iter().enumerate().for_each(|(ix, elem)| {
             let prio = elem.get_priority();
@@ -41,6 +46,7 @@ impl<T: HasPriority, R> RandomPriorityBag<T, R> {
         }
     }
 
+    /// Complexity: worst-case O(*e* log(*e*))
     #[inline]
     #[must_use]
     pub fn from_vec<V: Into<Vec<T>>>(vec: V, rng: R) -> Self {
@@ -49,6 +55,7 @@ impl<T: HasPriority, R> RandomPriorityBag<T, R> {
 }
 
 impl<T: HasPriority, R: Default> Default for RandomPriorityBag<T, R> {
+    /// Complexity: always O(1)
     #[inline]
     fn default() -> Self {
         Self {
@@ -62,6 +69,7 @@ impl<T: HasPriority, R: Default> Default for RandomPriorityBag<T, R> {
 impl<T: HasPriority<Priority: Clone> + Clone, R: Rng + SeedableRng> Clone
     for RandomPriorityBag<T, R>
 {
+    /// Complexity: always O(1) [assuming rng forking is O(1)]
     #[inline]
     fn clone(&self) -> Self {
         Self {
@@ -71,6 +79,7 @@ impl<T: HasPriority<Priority: Clone> + Clone, R: Rng + SeedableRng> Clone
         }
     }
 
+    /// Complexity: always O(1) [assuming rng forking is O(1)]
     #[inline]
     fn clone_from(&mut self, source: &Self) {
         self.group_ends.clone_from(&source.group_ends);
@@ -80,6 +89,7 @@ impl<T: HasPriority<Priority: Clone> + Clone, R: Rng + SeedableRng> Clone
 }
 
 impl<T: HasPriority, R: ?Sized> RandomPriorityBag<T, R> {
+    /// Complexity: always O(1)
     #[inline]
     #[must_use]
     pub const fn is_empty(&self) -> bool {
@@ -88,60 +98,71 @@ impl<T: HasPriority, R: ?Sized> RandomPriorityBag<T, R> {
         res
     }
 
+    /// Complexity: dependent on memory allocator
     #[inline]
     pub fn shrink_to_fit(&mut self) {
         self.elems.shrink_to_fit();
         self.group_ends.shrink_to_fit();
     }
 
+    /// Complexity: dependent on memory allocator
     #[inline]
     pub fn shrink_to(&mut self, elements: usize, priorities: usize) {
         self.elems.shrink_to(elements);
         self.group_ends.shrink_to(priorities);
     }
 
+    /// Complexity: dependent on memory allocator
     #[inline]
     pub fn reserve(&mut self, additional_elements: usize, additional_priorities: usize) {
         self.elems.reserve(additional_elements);
         self.group_ends.reserve(additional_priorities);
     }
 
+    /// Complexity: dependent on memory allocator
     #[inline]
     pub fn reserve_exact(&mut self, additional_elements: usize, additional_priorities: usize) {
         self.elems.reserve_exact(additional_elements);
         self.group_ends.reserve_exact(additional_priorities);
     }
 
+    /// Complexity: always O(1)
     #[inline]
     pub fn clear(&mut self) {
         self.elems.clear();
         self.group_ends.clear();
     }
 
+    /// Complexity: always O(1)
     #[inline]
     #[must_use]
     pub const fn len(&self) -> usize {
         self.elems.len()
     }
 
+    /// Complexity: always O(1)
     #[inline]
     #[must_use]
     pub const fn priorities_len(&self) -> usize {
         self.group_ends.len()
     }
 
+    /// Complexity: always O(1)
     #[inline]
     #[must_use]
     pub const fn capacity(&self) -> usize {
         self.elems.capacity()
     }
 
+    /// Complexity: always O(1)
     #[inline]
     #[must_use]
     pub const fn priorities_capacity(&self) -> usize {
         self.group_ends.capacity()
     }
 
+    /// Initial complexity: always O(1)
+    /// Complexity per iterated element: always O(1)
     #[inline]
     #[must_use]
     pub fn priorities(
@@ -152,6 +173,7 @@ impl<T: HasPriority, R: ?Sized> RandomPriorityBag<T, R> {
 }
 
 impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
+    /// Complexity: always O(*1*)
     pub fn pop_best(&mut self) -> Option<T> {
         if self.is_empty() {
             return None;
@@ -175,6 +197,7 @@ impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
         Some(best)
     }
 
+    /// Complexity: always O(*p*)
     pub fn pop_worst(&mut self) -> Option<T> {
         if self.is_empty() {
             return None;
@@ -201,6 +224,7 @@ impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
         self.elems.pop()
     }
 
+    /// Complexity: worst-case O(*p*)
     pub fn push(&mut self, new_elem: T) {
         let new_elem_priority = new_elem.get_priority();
 
@@ -238,6 +262,7 @@ impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
         }
     }
 
+    /// Complexity: always O(*e*)
     pub fn reshuffle(&mut self) {
         let mut rng = self.rng.lock();
         let mut prev_end = 0;
@@ -247,11 +272,15 @@ impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
         });
     }
 
+    /// Initial complexity:
+    /// Complexity per iterated element:
     #[inline]
     pub fn iter(&self) -> crate::iter::ElementsIterRef<'_, T, R> {
         self.into_iter()
     }
 
+    /// Initial complexity:
+    /// Complexity per iterated element:
     #[inline]
     pub fn iter_rev(&self) -> crate::iter::ElementsIterRefRev<'_, T, R> {
         let rng = &self.rng;
@@ -270,11 +299,15 @@ impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
         }
     }
 
+    /// Initial complexity:
+    /// Complexity per iterated element:
     #[inline]
     pub fn iter_mut(&mut self) -> crate::iter::ElementsIterMut<'_, T, R> {
         self.into_iter()
     }
 
+    /// Initial complexity:
+    /// Complexity per iterated element:
     #[inline]
     pub fn iter_mut_rev(&mut self) -> crate::iter::ElementsIterMutRev<'_, T, R> {
         let rng = self.rng.get_mut();
@@ -294,6 +327,7 @@ impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
 }
 
 impl<T: HasPriority, R: Rng> RandomPriorityBag<T, R> {
+    /// Complexity: always O(*e*)
     #[must_use]
     pub fn into_vec<V>(self) -> Vec<T> {
         let Self {
@@ -309,6 +343,7 @@ impl<T: HasPriority, R: Rng> RandomPriorityBag<T, R> {
         elems
     }
 
+    /// Complexity: worst-case O(*e* log(*e*))
     #[must_use]
     pub fn map<U, F>(self, f: F) -> RandomPriorityBag<U, R>
     where

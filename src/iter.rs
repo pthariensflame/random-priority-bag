@@ -13,6 +13,8 @@ impl<T: HasPriority, R: Rng> IntoIterator for RandomPriorityBag<T, R> {
 
     type IntoIter = ElementsIter<T, R>;
 
+    /// Initial complexity:
+    /// Complexity per iterated element:
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         ElementsIter { rpb: self }
@@ -20,6 +22,7 @@ impl<T: HasPriority, R: Rng> IntoIterator for RandomPriorityBag<T, R> {
 }
 
 impl<T: HasPriority, R> ElementsIter<T, R> {
+    /// Complexity:
     #[inline]
     #[must_use]
     pub fn into_random_priority_bag(self) -> RandomPriorityBag<T, R> {
@@ -30,11 +33,13 @@ impl<T: HasPriority, R> ElementsIter<T, R> {
 impl<T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIter<T, R> {
     type Item = T;
 
+    /// Complexity:
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.rpb.pop_best()
     }
 
+    /// Complexity:
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let len = self.len();
@@ -43,6 +48,7 @@ impl<T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIter<T, R> {
 }
 
 impl<T: HasPriority, R: ?Sized + Rng> DoubleEndedIterator for ElementsIter<T, R> {
+    /// Complexity:
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
         self.rpb.pop_worst()
@@ -50,6 +56,7 @@ impl<T: HasPriority, R: ?Sized + Rng> DoubleEndedIterator for ElementsIter<T, R>
 }
 
 impl<T: HasPriority, R: ?Sized + Rng> ExactSizeIterator for ElementsIter<T, R> {
+    /// Complexity:
     #[inline]
     fn len(&self) -> usize {
         self.rpb.len()
@@ -68,6 +75,7 @@ pub struct ElementsIterRef<'a, T: HasPriority, R: ?Sized> {
 }
 
 impl<'a, T: HasPriority, R: ?Sized> Clone for ElementsIterRef<'a, T, R> {
+    /// Complexity:
     #[inline]
     fn clone(&self) -> Self {
         Self {
@@ -79,6 +87,7 @@ impl<'a, T: HasPriority, R: ?Sized> Clone for ElementsIterRef<'a, T, R> {
         }
     }
 
+    /// Complexity:
     #[inline]
     fn clone_from(&mut self, source: &Self) {
         self.current_group_elems = source.current_group_elems;
@@ -95,6 +104,8 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> IntoIterator for &'a RandomPriorityBag
 
     type IntoIter = ElementsIterRef<'a, T, R>;
 
+    /// Initial complexity:
+    /// Complexity per iterated element:
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         let rng = &self.rng;
@@ -116,6 +127,7 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> IntoIterator for &'a RandomPriorityBag
 impl<'a, T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIterRef<'a, T, R> {
     type Item = &'a T;
 
+    /// Complexity:
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(next_ix) = self.current_group_ixs.next() {
@@ -142,6 +154,7 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIterRef<'a, T, R>
         }
     }
 
+    /// Complexity:
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let len = self.len();
@@ -150,6 +163,7 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIterRef<'a, T, R>
 }
 
 impl<'a, T: HasPriority, R: ?Sized + Rng> ExactSizeIterator for ElementsIterRef<'a, T, R> {
+    /// Complexity:
     #[inline]
     fn len(&self) -> usize {
         self.current_group_ixs.len() + self.remaining_elems.len()
@@ -169,6 +183,7 @@ pub struct ElementsIterRefRev<'a, T: HasPriority, R: ?Sized> {
 }
 
 impl<'a, T: HasPriority, R: ?Sized> Clone for ElementsIterRefRev<'a, T, R> {
+    /// Complexity:
     #[inline]
     fn clone(&self) -> Self {
         Self {
@@ -181,6 +196,7 @@ impl<'a, T: HasPriority, R: ?Sized> Clone for ElementsIterRefRev<'a, T, R> {
         }
     }
 
+    /// Complexity:
     #[inline]
     fn clone_from(&mut self, source: &Self) {
         self.current_group_elems = source.current_group_elems;
@@ -196,6 +212,7 @@ impl<'a, T: HasPriority, R: ?Sized> Clone for ElementsIterRefRev<'a, T, R> {
 impl<'a, T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIterRefRev<'a, T, R> {
     type Item = &'a T;
 
+    /// Complexity:
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(next_ix) = self.current_group_ixs.next() {
@@ -226,6 +243,7 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIterRefRev<'a, T,
         }
     }
 
+    /// Complexity:
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let len = self.len();
@@ -234,6 +252,7 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIterRefRev<'a, T,
 }
 
 impl<'a, T: HasPriority, R: ?Sized + Rng> ExactSizeIterator for ElementsIterRefRev<'a, T, R> {
+    /// Complexity:
     #[inline]
     fn len(&self) -> usize {
         self.current_group_ixs.len() + self.remaining_elems.len()
@@ -255,6 +274,8 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> IntoIterator for &'a mut RandomPriorit
 
     type IntoIter = ElementsIterMut<'a, T, R>;
 
+    /// Initial complexity:
+    /// Complexity per iterated element:
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         let rng = self.rng.get_mut();
@@ -275,6 +296,7 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> IntoIterator for &'a mut RandomPriorit
 impl<'a, T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIterMut<'a, T, R> {
     type Item = &'a mut T;
 
+    /// Complexity:
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(next_val) = self.current_group_elems.split_off_last_mut() {
@@ -295,6 +317,7 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIterMut<'a, T, R>
         }
     }
 
+    /// Complexity:
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let len = self.len();
@@ -303,6 +326,7 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIterMut<'a, T, R>
 }
 
 impl<'a, T: HasPriority, R: ?Sized + Rng> ExactSizeIterator for ElementsIterMut<'a, T, R> {
+    /// Complexity:
     #[inline]
     fn len(&self) -> usize {
         self.current_group_elems.len() + self.remaining_elems.len()
@@ -323,6 +347,7 @@ pub struct ElementsIterMutRev<'a, T: HasPriority, R: ?Sized> {
 impl<'a, T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIterMutRev<'a, T, R> {
     type Item = &'a mut T;
 
+    /// Complexity:
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(next_val) = self.current_group_elems.split_off_first_mut() {
@@ -347,6 +372,7 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIterMutRev<'a, T,
         }
     }
 
+    /// Complexity:
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         let len = self.len();
@@ -355,6 +381,7 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> Iterator for ElementsIterMutRev<'a, T,
 }
 
 impl<'a, T: HasPriority, R: ?Sized + Rng> ExactSizeIterator for ElementsIterMutRev<'a, T, R> {
+    /// Complexity:
     #[inline]
     fn len(&self) -> usize {
         self.current_group_elems.len() + self.remaining_elems.len()
@@ -368,6 +395,7 @@ where
     T: HasPriority,
     R: Default,
 {
+    /// Complexity:
     #[inline]
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         let elems = Vec::from_iter(iter);
@@ -380,6 +408,7 @@ where
     T: HasPriority,
     R: ?Sized,
 {
+    /// Complexity:
     fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
         let old_len = self.elems.len();
         self.elems.extend(iter);
@@ -388,7 +417,9 @@ where
         if increase > 0 {
             // only do work if needed
             self.elems.sort_unstable_by_key(T::get_priority);
-            self.group_ends.reserve(increase.isqrt()); // heuristic size increase
+            let estimated_additional_priorities =
+                T::estimate_distinct_priorities(self.elems.len()) - self.group_ends.len();
+            self.group_ends.reserve(estimated_additional_priorities);
             self.group_ends.clear();
             self.elems.iter().enumerate().for_each(|(ix, elem)| {
                 let prio = elem.get_priority();
