@@ -6,6 +6,8 @@ use std::iter::FusedIterator;
 /// Time complexities are stated in the variables:
 /// - *e*: number of elements
 /// - *p*: number of distinct priorities
+///
+/// `drop`` complexity: always O(*e*+*p*)
 pub struct RandomPriorityBag<T: HasPriority, R: ?Sized> {
     pub(crate) group_ends: Vec<(T::Priority, usize)>,
     pub(crate) elems: Vec<T>,
@@ -162,7 +164,7 @@ impl<T: HasPriority, R: ?Sized> RandomPriorityBag<T, R> {
     }
 
     /// Initial complexity: always O(1)
-    /// Complexity per iterated element: always O(1)
+    /// Complexity per iteration: always O(1)
     #[inline]
     #[must_use]
     pub fn priorities(
@@ -272,15 +274,15 @@ impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
         });
     }
 
-    /// Initial complexity:
-    /// Complexity per iterated element:
+    /// Initial complexity: always O(1)
+    /// Complexity per iteration: amortized O(1), worst-case O(*e*÷*p*)
     #[inline]
     pub fn iter(&self) -> crate::iter::ElementsIterRef<'_, T, R> {
         self.into_iter()
     }
 
-    /// Initial complexity:
-    /// Complexity per iterated element:
+    /// Initial complexity: always O(1)
+    /// Complexity per iteration: amortized O(1), worst-case O(*e*÷*p*)
     #[inline]
     pub fn iter_rev(&self) -> crate::iter::ElementsIterRefRev<'_, T, R> {
         let rng = &self.rng;
@@ -299,15 +301,15 @@ impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
         }
     }
 
-    /// Initial complexity:
-    /// Complexity per iterated element:
+    /// Initial complexity: always O(1)
+    /// Complexity per iteration: amortized O(1), worst-case O(*e*÷*p*)
     #[inline]
     pub fn iter_mut(&mut self) -> crate::iter::ElementsIterMut<'_, T, R> {
         self.into_iter()
     }
 
-    /// Initial complexity:
-    /// Complexity per iterated element:
+    /// Initial complexity: always O(1)
+    /// Complexity per iteration: amortized O(1), worst-case O(*e*÷*p*)
     #[inline]
     pub fn iter_mut_rev(&mut self) -> crate::iter::ElementsIterMutRev<'_, T, R> {
         let rng = self.rng.get_mut();
