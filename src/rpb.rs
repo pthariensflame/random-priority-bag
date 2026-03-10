@@ -204,37 +204,37 @@ impl<T: HasPriority, R: ?Sized + Rng> RandomPriorityBag<T, R> {
     pub fn push(&mut self, new_elem: T) {
         let new_elem_priority = new_elem.get_priority();
 
-        let group_pos = self
+        let selected_group_pos = self
             .group_ends
             .partition_point(|(group_priority, _)| new_elem_priority <= *group_priority);
 
-        if let Some(&(ref group_priority, group_end)) = self.group_ends.get(group_pos)
+        self.elems.push(new_elem);
+
+        if let Some((group_priority, _)) = self.group_ends.get(selected_group_pos)
             && *group_priority == new_elem_priority
         {
-            // including current (existing) group
-            if let Some(later_groups) = self.group_ends.get_mut(group_pos..) {
-                later_groups.iter_mut().for_each(|(_, later_group_end)| {
-                    *later_group_end += 1;
-                });
+            // group already exists, insert at end
+            // this loop will only run any iterations if there are at least 2 existing groups
+            for i in (selected_group_pos + 1..self.group_ends.len()).rev() {
+                self.elems
+                    .swap(self.group_ends[i - 1].1, self.group_ends[i].1);
+                self.group_ends[i].1 += 1;
             }
-
-            self.elems.insert(group_end, new_elem);
+            self.group_ends[selected_group_pos].1 += 1;
         } else {
-            let new_elem_pos = self
-                .group_ends
-                .get(group_pos)
-                .map_or(self.elems.len(), |(_, pos)| *pos);
-            self.group_ends
-                .insert(group_pos, (new_elem_priority, new_elem_pos));
+            // new group needed
+            let mut new_group_end = self.elems.len();
 
-            // excluding current (new) group
-            if let Some(later_groups) = self.group_ends.get_mut((group_pos + 1)..) {
-                later_groups.iter_mut().for_each(|(_, later_group_end)| {
-                    *later_group_end += 1;
-                });
+            // this loop will only run any iterations if there was at least 1 previously existing group
+            for i in (selected_group_pos..self.group_ends.len()).rev() {
+                self.elems
+                    .swap(self.group_ends[i - 1].1, self.group_ends[i].1);
+                self.group_ends[i].1 += 1;
+                new_group_end = self.group_ends[i - 1].1 + 1;
             }
 
-            self.elems.insert(new_elem_pos, new_elem);
+            self.group_ends
+                .insert(selected_group_pos, (new_elem_priority, new_group_end));
         }
     }
 
