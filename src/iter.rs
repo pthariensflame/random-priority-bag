@@ -262,6 +262,8 @@ impl<'a, T: HasPriority, R: ?Sized + Rng> ExactSizeIterator for ElementsIterRefR
 
 impl<'a, T: HasPriority, R: ?Sized + Rng> FusedIterator for ElementsIterRefRev<'a, T, R> {}
 
+/// Warning: do not mutate elements in ways that may change their priorities (resulting behavior will be
+/// safe but not correct)
 #[must_use]
 pub struct ElementsIterMut<'a, T: HasPriority, R: ?Sized> {
     pub(crate) current_group_elems: &'a mut [T],

@@ -54,6 +54,26 @@ impl<T: HasPriority, R> RandomPriorityBag<T, R> {
     pub fn from_vec<V: Into<Vec<T>>>(vec: V, rng: R) -> Self {
         Self::reconstruct_from_elems(vec.into(), Mutex::new(rng))
     }
+
+    /// Useful to reestablish correct operation if it becomes broken (*e.g.*, by mutating elements
+    /// in-place in priority-changing ways).
+    ///
+    /// Complexity: worst-case O(*e* log(*e*))
+    #[inline]
+    pub fn reconstruct(&mut self) {
+        self.group_ends.clear();
+        self.elems.sort_unstable_by_key(T::get_priority);
+        self.elems.iter().enumerate().for_each(|(ix, elem)| {
+            let prio = elem.get_priority();
+            if let Some((existing_prio, existing_ix)) = self.group_ends.last_mut()
+                && *existing_prio == prio
+            {
+                *existing_ix = ix;
+            } else {
+                self.group_ends.push((prio, ix));
+            }
+        });
+    }
 }
 
 impl<T: HasPriority, R: Default> Default for RandomPriorityBag<T, R> {
